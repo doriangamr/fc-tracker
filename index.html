@@ -137,7 +137,7 @@ input:focus,select:focus{border-color:#4c8cc8}
 
 <section class="card table-card">
     <div class="table-top">
-        <div class="status" id="status">FyreMC adatok betöltése...</div>
+        <div class="status" id="status">Helyi adatok betöltése...</div>
         <div class="actions">
             <button class="add" onclick="openFcModal('add')">FC Hozzáadása</button>
             <button class="remove" onclick="openFcModal('remove')">FC Elvétele</button>
@@ -202,7 +202,6 @@ input:focus,select:focus{border-color:#4c8cc8}
      <label>Egyedi rang neve</label>
      <input id="customRank" type="text" placeholder="Bunny">
    </div>
-   <div class="help"></div>
    <div class="modal-actions"><button id="rankConfirm" class="green" onclick="confirmRank()">Rang hozzáadása</button><button onclick="closeModals()">Mégse</button></div>
   </div>
  </div>
@@ -217,7 +216,6 @@ const PLAYERS = [
 const RANK_OPTIONS = [
     "Bunny","Glacier","Abyss","Egyedi rang"
 ];
-const API_BASE = "https://account.fyremc.hu/api/player/";
 const PER_RUN = 3600;
 
 const overrides = JSON.parse(localStorage.getItem("fcAdjustments") || "{}");
@@ -227,7 +225,7 @@ let goal = Number(localStorage.getItem("fcGoal") || 100000);
 let players = PLAYERS.map(name => ({
     name,
     rank:"Betöltés...",
-    fc:null,
+    fc:0,
     adjustment:Number(overrides[name] || 0),
     ranks:Array.isArray(savedRanks[name]) ? savedRanks[name] : []
 }));
@@ -333,7 +331,7 @@ function confirmFc(){
     const amount=Number(document.getElementById("fcAmount").value);
     if(!Number.isFinite(amount)||amount<=0){alert("Adj meg egy pozitív FC értéket.");return;}
     const p=players[i];
-    if(!Number.isFinite(p.fc)){alert("Ehhez a fiókhoz még nincs betöltött FC adat.");return;}
+    if(!Number.isFinite(p.fc)) p.fc=0;
     const signed=fcMode==="add"?amount:-amount;
     p.fc=Math.max(0,p.fc+signed);
     p.adjustment=(p.adjustment||0)+signed;
@@ -412,10 +410,7 @@ function dailyFc(){
     }
 
     const p=players[selectedIndex];
-    if(!Number.isFinite(p.fc)){
-        alert("Ehhez a fiókhoz még nincs betöltött FC adat.");
-        return;
-    }
+    if(!Number.isFinite(p.fc)) p.fc=0;
 
     const rankCount=(p.ranks || []).length;
     const amount=rankCount*40;
@@ -445,96 +440,27 @@ document.querySelectorAll(".modal-bg").forEach(bg=>{
     bg.addEventListener("click",e=>{if(e.target===bg)closeModals();});
 });
 
-async function fetchPlayer(name){
-    // Ez csak akkor működik automatikusan, ha a megadott végpont valóban
-    // nyilvános JSON API és engedélyezi a böngészőből érkező CORS kéréseket.
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    let response;
-    try {
-        response = await fetch(API_BASE + encodeURIComponent(name), {
-            headers:{Accept:"application/json"},
-            cache:"no-store",
-            signal: controller.signal
-        });
-    } finally {
-        clearTimeout(timeout);
-    }
-    if(!response.ok) throw new Error("HTTP " + response.status);
-    const data = await response.json();
-
-    const fc = findNumber(data,[
-        "fyrecoin","fyrecoins","fyreCoin","fyreCoins","fc","coins","balance","currency"
-    ]);
-    const rank = findRank(data);
-
-    return {fc,rank};
-}
-
-function showApiProblem(){
-    document.getElementById("status").innerHTML =
-        '<span class="error">A FyreMC adatok jelenleg nem érhetők el az API-n keresztül.</span>';
-    document.getElementById("players").innerHTML = players.map((p,i)=>`
-        <tr class="${i===selectedIndex?'selected':''}" onclick="selectPlayer(${i})">
-            <td>${escapeHtml(p.name)}</td>
-            <td><span class="badge rank">${escapeHtml(
-                p.ranks && p.ranks.length ? p.ranks.join(", ") : "Rang megadása szükséges"
-            )}</span></td>
-            <td><span class="badge fc">${
-                Number.isFinite(p.fc) ? escapeHtml(fmt(p.fc)+" FC") : "FC megadása szükséges"
-            }</span></td>
-        </tr>
-    `).join("");
-    updateSummary();
-}
-
-async function loadPlayers(){
-    document.getElementById("status").textContent="FyreMC adatok frissítése...";
-
+function loadPlayers(){
+    document.getElementById("status").textContent="Adatok frissítve.";
     const latestAdjustments=JSON.parse(localStorage.getItem("fcAdjustments") || "{}");
     const latestRanks=JSON.parse(localStorage.getItem("fcTrackerRanks") || "{}");
 
     players=PLAYERS.map(name=>({
         name,
-        rank:"Betöltés...",
-        fc:null,
+        rank:"Ismeretlen",
+        fc:0,
         adjustment:Number(latestAdjustments[name] || 0),
         ranks:Array.isArray(latestRanks[name]) ? latestRanks[name] : []
     }));
 
+    // A korábban elmentett kézi FC értékek visszaállítása.
+    players.forEach(p=>{
+        p.fc=Math.max(0, Number(p.adjustment || 0));
+    });
+
     render();
-
-    let success=0;
-    let firstError="";
-
-    for(const p of players){
-        try{
-            const result=await fetchPlayer(p.name);
-
-            p.rank=result.rank || "Ismeretlen";
-            p.fc=Number.isFinite(result.fc) ? result.fc : null;
-
-            // A kézi FC-korrekció hozzáadódik az API-ból kapott alapértékhez.
-            if(Number.isFinite(p.fc) && p.adjustment) p.fc += p.adjustment;
-
-            if(Number.isFinite(p.fc)) success++;
-        }catch(e){
-            if(!firstError) firstError=String(e && e.message ? e.message : e);
-            p.rank="Nem elérhető";
-            p.fc=null;
-        }
-        render();
-    }
-
-    if(success===0){
-        showApiProblem();
-        console.warn("FyreMC API lekérés sikertelen:", firstError);
-        return;
-    }
-
-    document.getElementById("status").textContent =
-        success + "/" + players.length + " játékos adata betöltve.";
 }
+
 loadPlayers();
 </script>
 </body>
