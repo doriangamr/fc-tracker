@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Farm Státusz | FC Tracker</title>
+<style>
+*{box-sizing:border-box}
+body{
+    margin:0; min-height:100vh; padding:36px 27px 50px;
+    background:#0f172a; color:#f8fafc;
+    font-family:Arial,Helvetica,sans-serif;
+}
+.page-title{
+    text-align:center; font-size:40px; font-weight:700;
+    margin:0 0 41px; letter-spacing:-.5px;
+    background:linear-gradient(90deg,#9a8cf6,#4bb8f2);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.card{
+    width:min(900px,100%); margin:0 auto;
+    background:#1e2a3d; border-radius:16px;
+    box-shadow:0 12px 30px rgba(0,0,0,.18);
+}
+.summary{padding:27px 25px 24px;text-align:center}
+.total{font-size:21px;font-weight:700}
+.total .current{color:#3eb7ed}
+.progress-track{height:29px;margin:21px 0 14px;background:#344257;border-radius:20px;overflow:hidden}
+.progress-fill{
+    height:100%;width:0;border-radius:20px;
+    background:linear-gradient(90deg,#8c58ef,#39b7ed);
+    transition:width .25s ease;
+}
+.percentage{color:#9cb0c9;font-size:15px}
+.remaining{
+    display:inline-flex;flex-direction:column;align-items:center;
+    margin-top:15px;padding:14px 17px 10px;min-width:301px;
+    background:#35283f;border-radius:8px;color:#ff687f;
+}
+.remaining-main{font-size:16px;font-weight:700}
+.remaining-small{margin-top:5px;font-size:12px;color:#c9697e}
+.editable{
+    cursor:pointer;border-bottom:1px dashed #8ea0bd;
+    transition:.15s;
+}
+.editable:hover{color:#b7c5ff}
+.table-card{margin-top:40px;padding:18px 20px 20px}
+.table-top{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:15px;margin:0 0 10px;
+}
+.status{color:#91a6c1;font-size:12px}
+.actions{display:flex;gap:8px}
+button{
+    border:0;border-radius:8px;padding:9px 12px;
+    color:#fff;background:#334155;cursor:pointer;
+    font-weight:700;font-size:13px;
+    transition:transform .12s ease,filter .12s ease;
+}
+button:hover{filter:brightness(1.15)}
+button:active{transform:scale(.97)}
+.add{background:#21a366}.remove{background:#b93648}.ranks{background:#347ec4}.daily{background:#7558d9}.refresh{background:#475569}
+.table-wrap{overflow-x:auto}
+table{width:100%;min-width:650px;border-collapse:collapse}
+th{
+    text-align:left;padding:16px 15px;color:#91a6c1;
+    font-size:14px;font-weight:700;border-bottom:1px solid #344257;
+    white-space:nowrap;cursor:pointer;user-select:none;
+}
+th:hover{color:#c1d0e5}
+td{padding:13px 15px;font-size:16px;font-weight:700;white-space:nowrap}
+tbody tr{transition:background .12s;cursor:pointer}
+tbody tr:hover{background:rgba(255,255,255,.025)}
+tbody tr.selected{background:rgba(80,170,235,.08)}
+.badge{display:inline-block;padding:8px 12px;border-radius:8px;font-size:13px;line-height:1}
+.rank{color:#ff687f;background:#472e49}
+.fc{color:#9a8cf4;background:#34326b}
+.loading{color:#91a6c1;font-weight:600}
+.error{color:#ff687f;font-weight:600}
+.notice{
+    margin-top:12px;padding:10px 12px;border-radius:8px;
+    background:#172235;color:#91a6c1;font-size:12px;line-height:1.45;
+}
+
+/* Modalok */
+.modal-bg{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,7,18,.78);backdrop-filter:blur(5px);z-index:100}
+.modal-bg.open{display:flex}
+.modal{width:min(500px,100%);background:#111827;border:1px solid #29364b;border-radius:16px;box-shadow:0 25px 70px rgba(0,0,0,.5);overflow:hidden}
+.modal-head{padding:19px 21px 16px;border-top:3px solid #347ec4;display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:20px;font-weight:700}
+.close{background:#273449;color:#9fb0c7;border-radius:7px;padding:7px 10px;font-size:16px}
+.modal-body{padding:18px 21px 21px}
+label{display:block;margin:0 0 8px;color:#aeb8c7;font-size:13px;font-weight:700;text-transform:uppercase}
+input,select{width:100%;border:1px solid #30394a;border-radius:10px;background:#15171c;color:#f4f4f5;padding:13px 14px;outline:none;font-size:15px}
+input:focus,select:focus{border-color:#4c8cc8}
+.field{margin-bottom:16px}
+.modal-actions{display:flex;gap:9px;margin-top:18px}
+.modal-actions button{flex:1;padding:12px}
+.green{background:#21a366}.red{background:#b93648}
+.current-box{background:#192335;border-radius:10px;padding:12px 13px;margin-bottom:17px;color:#9fb0c7;font-size:13px}
+.current-box strong{color:#fff}
+.rank-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.rank-chip{background:#472e49;color:#ff7184;border-radius:7px;padding:7px 9px;font-size:12px;font-weight:700}
+.empty-ranks{color:#7f8da2;font-size:13px}
+.help{margin-top:8px;color:#75849a;font-size:11px;line-height:1.4}
+
+@media(max-width:650px){
+    body{padding:25px 14px 40px}
+    .page-title{font-size:30px;margin-bottom:30px}
+    .summary{padding:23px 15px}
+    .total{font-size:18px}
+    .remaining{min-width:0;width:100%}
+    .table-top{align-items:flex-start;flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<h1 class="page-title">Farm Státusz | FC Tracker</h1>
+
+<section class="card summary">
+    <div class="total">
+        Összesített FC:
+        <span class="current" id="currentFc">Betöltés...</span>
+        / <span class="editable" id="goal" title="Kattints a cél szerkesztéséhez">500.000</span> FC
+    </div>
+
+    <div class="progress-track">
+        <div class="progress-fill" id="progress"></div>
+    </div>
+
+    <div class="percentage">Teljes cél <span id="percent">0%</span>-a teljesítve</div>
+
+    <div class="remaining">
+        <div class="remaining-main">Még <span id="runsLeft">—</span> teljes lefutás szükséges a célig</div>
+        <div class="remaining-small">(körönként 3.600 FC-vel számolva)</div>
+    </div>
+</section>
+
+<section class="card table-card">
+    <div class="table-top">
+        <div class="status" id="status">FyreMC adatok betöltése...</div>
+        <div class="actions">
+            <button class="add" onclick="openFcModal('add')">FC Hozzáadása</button>
+            <button class="remove" onclick="openFcModal('remove')">FC Elvétele</button>
+            <button class="ranks" onclick="openRankMenu()">Rangok kezelése</button>
+            <button class="daily" onclick="dailyFc()">Napi FC</button>
+            <button class="refresh" onclick="loadPlayers()">↻ Frissítés</button>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th onclick="sortBy('name')">FELHASZNÁLÓNÉV <span id="sort-name">↕</span></th>
+                    <th onclick="sortBy('rank')">RANG <span id="sort-rank">↕</span></th>
+                    <th onclick="sortBy('fc')">JELENLEGI FC <span id="sort-fc">↕</span></th>
+                </tr>
+            </thead>
+            <tbody id="players">
+                <tr><td colspan="3" class="loading">Adatok betöltése...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="notice">
+        Az FC a FyreMC adatforrásból próbál betöltődni. A rangokat a Rangok kezelése menüben kézzel tudod vezetni, mert a FyreMC nem engedi a rang közvetlen lekérését. A módosítások csak ebben a saját trackerben mentődnek.
+    </div>
+</section>
+
+<!-- FC módosító menü -->
+<div class="modal-bg" id="fcModal">
+ <div class="modal">
+  <div class="modal-head"><div class="modal-title" id="fcModalTitle">FC Hozzáadása</div><button class="close" onclick="closeModals()">×</button></div>
+  <div class="modal-body">
+   <div class="field"><label>Felhasználónév</label><select id="fcUser"></select></div>
+   <div class="field"><label>Mennyiség (FC)</label><input id="fcAmount" type="number" min="1" step="1" placeholder="Pl. 5000"></div>
+   <div class="field"><label>Megjegyzés</label><input id="fcNote" type="text" placeholder="Pl. Elszámolás"></div>
+   <div class="modal-actions"><button class="green" id="fcConfirm" onclick="confirmFc()">FC Hozzáadása</button><button onclick="closeModals()">Mégse</button></div>
+  </div>
+ </div>
+</div>
+
+<!-- Rangok kezelése -->
+<div class="modal-bg" id="rankMenuModal">
+ <div class="modal">
+  <div class="modal-head"><div class="modal-title">Rangok kezelése</div><button class="close" onclick="closeModals()">×</button></div>
+  <div class="modal-body">
+   <div class="field"><label>Fiók</label><select id="rankUser" onchange="showSelectedRanks()"></select></div>
+   <div class="current-box"><strong>Jelenlegi rangok:</strong><div class="rank-list" id="currentRanks"></div></div>
+   <div class="modal-actions"><button class="green" onclick="openRankEdit('add')">Rang hozzáadása</button><button class="red" onclick="openRankEdit('remove')">Rang elvétele</button></div>
+  </div>
+ </div>
+</div>
+
+<!-- Rang szerkesztése -->
+<div class="modal-bg" id="rankEditModal">
+ <div class="modal">
+  <div class="modal-head"><div class="modal-title" id="rankEditTitle">Rang hozzáadása</div><button class="close" onclick="closeModals()">×</button></div>
+  <div class="modal-body">
+   <div class="field"><label>Fiók</label><select id="rankEditUser"></select></div>
+   <div class="field"><label>Rang</label><select id="rankChoice"></select></div>
+   <div class="field" id="customRankField" style="display:none">
+     <label>Egyedi rang neve</label>
+     <input id="customRank" type="text" placeholder="Pl. Manager">
+   </div>
+   <div class="help">Mivel a FyreMC nem engedi a rang közvetlen lekérését, itt kézzel tudod felvenni az accounton lévő rangokat. Minden felvett rang 1 rangnak számít a Napi FC-nél.</div>
+   <div class="modal-actions"><button id="rankConfirm" class="green" onclick="confirmRank()">Rang hozzáadása</button><button onclick="closeModals()">Mégse</button></div>
+  </div>
+ </div>
+</div>
+
+<script>
+const PLAYERS = [
+    "weening","BlacknWhite","Suarez","Med1cine","MedIcine","nemtomkivok459",
+    "feaved","wemlo","nlzm","aqe","uzner","wstvd","doriangamr"
+];
+
+const RANK_OPTIONS = [
+    "Glacier","Bunny","Abyss","Titan","Legend","Hero","King","Duke",
+    "Prince","Lord","Knight","VIP","VIP+","MVP","MVP+","Egyedi rang"
+];
+const API_BASE = "https://account.fyremc.hu/api/player/";
+const PER_RUN = 3600;
+let goal = Number(localStorage.getItem("fcGoal") || 500000);
+let players = PLAYERS.map(name => ({
+    name,
+    rank:"Betöltés...",
+    fc:null,
+    adjustment:Number(overrides[name] || 0),
+    ranks:Array.isArray(savedRanks[name]) ? savedRanks[name] : []
+}));
+let selectedIndex = -1;
+let sortKey = null;
+let sortDirection = 1;
+
+const overrides = JSON.parse(localStorage.getItem("fcAdjustments") || "{}");
+const savedRanks = JSON.parse(localStorage.getItem("fcTrackerRanks") || "{}");
+
+function fmt(n){
+    return Math.round(Number(n)).toLocaleString("hu-HU");
+}
+function save(){
+    localStorage.setItem("fcGoal", String(goal));
+    localStorage.setItem("fcAdjustments", JSON.stringify(
+        Object.fromEntries(players.map(p => [p.name,p.adjustment || 0]).filter(([,v]) => v))
+    ));
+    localStorage.setItem("fcTrackerRanks", JSON.stringify(
+        Object.fromEntries(players.map(p => [p.name,p.ranks || []]))
+    ));
+}
+function updateSummary(){
+    const total = players.reduce((s,p)=>s + (Number.isFinite(p.fc) ? p.fc : 0), 0);
+    const loaded = players.filter(p => Number.isFinite(p.fc)).length;
+    document.getElementById("currentFc").textContent = loaded ? fmt(total) : "Nincs adat";
+    document.getElementById("goal").textContent = fmt(goal);
+
+    if(loaded){
+        const raw = Math.min((total / goal) * 100, 100);
+        document.getElementById("progress").style.width = Math.max(0,raw) + "%";
+        document.getElementById("percent").textContent = Math.floor(Math.max(0,raw));
+        document.getElementById("runsLeft").textContent = Math.max(0,Math.ceil((goal-total)/PER_RUN));
+    }else{
+        document.getElementById("progress").style.width = "0%";
+        document.getElementById("percent").textContent = "0";
+        document.getElementById("runsLeft").textContent = "—";
+    }
+}
+function render(){
+    const body = document.getElementById("players");
+    let list = [...players];
+
+    if(sortKey){
+        list.sort((a,b)=>{
+            let av = a[sortKey], bv = b[sortKey];
+            if(sortKey === "fc"){
+                av = Number.isFinite(av) ? av : -Infinity;
+                bv = Number.isFinite(bv) ? bv : -Infinity;
+            }else{
+                av = String(av).toLocaleLowerCase("hu");
+                bv = String(bv).toLocaleLowerCase("hu");
+            }
+            return av < bv ? -sortDirection : av > bv ? sortDirection : 0;
+        });
+    }
+
+    body.innerHTML = list.map(p=>{
+        const realIndex = players.indexOf(p);
+        const rank = p.ranks && p.ranks.length ? p.ranks.join(", ") : (p.rank || "Ismeretlen");
+        const fc = Number.isFinite(p.fc) ? fmt(p.fc) + " FC" : "Nincs adat";
+        return `<tr class="${realIndex===selectedIndex?'selected':''}" onclick="selectPlayer(${realIndex})">
+            <td>${escapeHtml(p.name)}</td>
+            <td><span class="badge rank">${escapeHtml(rank)}</span></td>
+            <td><span class="badge fc">${escapeHtml(fc)}</span></td>
+        </tr>`;
+    }).join("");
+
+    ["name","rank","fc"].forEach(k=>{
+        document.getElementById("sort-"+k).textContent =
+            sortKey===k ? (sortDirection===1 ? "↑" : "↓") : "↕";
+    });
+    updateSummary();
+}
+function escapeHtml(v){
+    return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+}
+function selectPlayer(i){
+    selectedIndex=i;
+    render();
+}
+function sortBy(key){
+    if(sortKey===key) sortDirection *= -1;
+    else { sortKey=key; sortDirection=1; }
+    render();
+}
+
+function populateUsers(selectId, preferSelected=true){
+    const select=document.getElementById(selectId);
+    const old=select.value;
+    select.innerHTML=players.map((p,i)=>`<option value="${i}">${escapeHtml(p.name)}</option>`).join("");
+    if(preferSelected && selectedIndex>=0) select.value=selectedIndex;
+    else if(old!=="") select.value=old;
+}
+
+function openFcModal(mode){
+    fcMode=mode;
+    populateUsers("fcUser");
+    if(selectedIndex>=0) document.getElementById("fcUser").value=selectedIndex;
+    document.getElementById("fcModalTitle").textContent=mode==="add"?"FC Hozzáadása":"FC Elvétele";
+    const btn=document.getElementById("fcConfirm");
+    btn.textContent=mode==="add"?"FC Hozzáadása":"FC Elvétele";
+    btn.className=mode==="add"?"green":"red";
+    document.getElementById("fcAmount").value="";
+    document.getElementById("fcNote").value="";
+    document.getElementById("fcModal").classList.add("open");
+}
+
+function confirmFc(){
+    const i=Number(document.getElementById("fcUser").value);
+    const amount=Number(document.getElementById("fcAmount").value);
+    if(!Number.isFinite(amount)||amount<=0){alert("Adj meg egy pozitív FC értéket.");return;}
+    const p=players[i];
+    if(!Number.isFinite(p.fc)){alert("Ehhez a fiókhoz még nincs betöltött FC adat.");return;}
+    const signed=fcMode==="add"?amount:-amount;
+    p.fc=Math.max(0,p.fc+signed);
+    p.adjustment=(p.adjustment||0)+signed;
+    selectedIndex=i;
+    save();render();closeModals();
+}
+
+function openRankMenu(){
+    populateUsers("rankUser");
+    if(selectedIndex>=0) document.getElementById("rankUser").value=selectedIndex;
+    showSelectedRanks();
+    document.getElementById("rankMenuModal").classList.add("open");
+}
+
+function showSelectedRanks(){
+    const i=Number(document.getElementById("rankUser").value);
+    const p=players[i];
+    document.getElementById("currentRanks").innerHTML=p.ranks.length
+        ?p.ranks.map(r=>`<span class="rank-chip">${escapeHtml(r)}</span>`).join("")
+        :'<span class="empty-ranks">Nincs kézzel hozzáadott rang.</span>';
+}
+
+function openRankEdit(mode){
+    rankMode=mode;
+    const user=Number(document.getElementById("rankUser").value);
+    populateUsers("rankEditUser",false);
+    document.getElementById("rankEditUser").value=user;
+    const p=players[user];
+    const options=mode==="add"
+        ?RANK_OPTIONS.filter(r=>!p.ranks.includes(r))
+        :p.ranks;
+
+    document.getElementById("rankChoice").innerHTML=options.length
+        ?options.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("")
+        :'<option value="">Nincs választható rang</option>';
+
+    document.getElementById("customRankField").style.display =
+        mode==="add" ? "block" : "none";
+    document.getElementById("customRank").value="";
+    document.getElementById("rankEditTitle").textContent =
+        mode==="add"?"Rang hozzáadása":"Rang elvétele";
+    const btn=document.getElementById("rankConfirm");
+    btn.textContent=mode==="add"?"Rang hozzáadása":"Rang elvétele";
+    btn.className=mode==="add"?"green":"red";
+    document.getElementById("rankMenuModal").classList.remove("open");
+    document.getElementById("rankEditModal").classList.add("open");
+}
+
+function confirmRank(){
+    const i=Number(document.getElementById("rankEditUser").value);
+    let rank=document.getElementById("rankChoice").value;
+
+    if(rankMode==="add" && rank==="Egyedi rang"){
+        rank=document.getElementById("customRank").value.trim();
+    }
+
+    if(!rank){
+        alert("Adj meg vagy válassz egy rangot.");
+        return;
+    }
+
+    const p=players[i];
+    if(rankMode==="add"){
+        if(!p.ranks.includes(rank)) p.ranks.push(rank);
+    }else{
+        p.ranks=p.ranks.filter(r=>r!==rank);
+    }
+    selectedIndex=i;
+    save();render();closeModals();
+}
+
+function dailyFc(){
+    if(selectedIndex<0){
+        alert("Előbb kattints arra a játékosra, akinek a napi FC-jét hozzáadod.");
+        return;
+    }
+
+    const p=players[selectedIndex];
+    if(!Number.isFinite(p.fc)){
+        alert("Ehhez a fiókhoz még nincs betöltött FC adat.");
+        return;
+    }
+
+    const rankCount=(p.ranks || []).length;
+    const amount=rankCount*40;
+
+    if(rankCount===0){
+        alert("Ennek az accountnak nincs hozzáadott rangja. Előbb a Rangok kezelése menüben add hozzá a rangjait.");
+        return;
+    }
+
+    p.fc+=amount;
+    p.adjustment=(p.adjustment||0)+amount;
+
+    save();
+    render();
+
+    alert(
+        `${p.name} napi FC-je hozzáadva: +${fmt(amount)} FC\n` +
+        `${rankCount} rang × 40 FC = ${fmt(amount)} FC`
+    );
+}
+
+function closeModals(){
+    document.querySelectorAll(".modal-bg").forEach(m=>m.classList.remove("open"));
+}
+
+document.querySelectorAll(".modal-bg").forEach(bg=>{
+    bg.addEventListener("click",e=>{if(e.target===bg)closeModals();});
+});
+
+async function fetchPlayer(name){
+    const response=await fetch(API_BASE + encodeURIComponent(name),{
+        headers:{Accept:"application/json"}
+    });
+    if(!response.ok) throw new Error("HTTP "+response.status);
+    const data=await response.json();
+
+    const fc=findNumber(data,[
+        "fyrecoin","fyrecoins","fc","coins","balance","currency"
+    ]);
+    const rank=findRank(data);
+
+    return {fc,rank};
+}
+
+async function loadPlayers(){
+    document.getElementById("status").textContent="FyreMC adatok frissítése...";
+
+    const latestAdjustments=JSON.parse(localStorage.getItem("fcAdjustments") || "{}");
+    const latestRanks=JSON.parse(localStorage.getItem("fcTrackerRanks") || "{}");
+
+    players=PLAYERS.map(name=>({
+        name,
+        rank:"Betöltés...",
+        fc:null,
+        adjustment:Number(latestAdjustments[name] || 0),
+        ranks:Array.isArray(latestRanks[name]) ? latestRanks[name] : []
+    }));
+
+    render();
+
+    let success=0;
+    for(const p of players){
+        try{
+            const result=await fetchPlayer(p.name);
+            p.rank=result.rank || "Ismeretlen";
+            p.fc=Number.isFinite(result.fc) ? result.fc : null;
+
+            // A kézi FC-korrekció hozzáadódik a FyreMC-ről kapott alapértékhez.
+            if(Number.isFinite(p.fc) && p.adjustment) p.fc += p.adjustment;
+
+            if(Number.isFinite(p.fc)) success++;
+        }catch(e){
+            p.rank="Nem elérhető";
+            p.fc=null;
+        }
+        render();
+    }
+
+    document.getElementById("status").textContent =
+        success + "/" + players.length + " játékos adata betöltve.";
+}
+loadPlayers();
+</script>
+</body>
+</html>
