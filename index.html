@@ -116,13 +116,13 @@ input:focus,select:focus{border-color:#4c8cc8}
 </head>
 <body>
 
-<h1 class="page-title">Farm Státusz | FC Tracker</h1>
+<h1 class="page-title">FyreCoin státusz</h1>
 
 <section class="card summary">
     <div class="total">
         Összesített FC:
         <span class="current" id="currentFc">Betöltés...</span>
-        / <span class="editable" id="goal" title="Kattints a cél szerkesztéséhez">100.000</span>FC
+        / <span class="editable" id="goal" >100.000</span>FC
     </div>
 
     <div class="progress-track">
@@ -131,6 +131,7 @@ input:focus,select:focus{border-color:#4c8cc8}
 
     <div class="remaining">
         <div class="remaining-main">Körönként 450 FC-vel számolva</div>
+        <div class="remaining-small">Hetente 3 250 FC</div>
     </div>
 </section>
 
@@ -201,7 +202,7 @@ input:focus,select:focus{border-color:#4c8cc8}
      <label>Egyedi rang neve</label>
      <input id="customRank" type="text" placeholder="Bunny">
    </div>
-   <div class="help">Mivel a FyreMC nem engedi a rang közvetlen lekérését, itt kézzel tudod felvenni az accounton lévő rangokat. Minden felvett rang 1 rangnak számít a Napi FC-nél.</div>
+   <div class="help"></div>
    <div class="modal-actions"><button id="rankConfirm" class="green" onclick="confirmRank()">Rang hozzáadása</button><button onclick="closeModals()">Mégse</button></div>
   </div>
  </div>
@@ -222,7 +223,7 @@ const PER_RUN = 3600;
 const overrides = JSON.parse(localStorage.getItem("fcAdjustments") || "{}");
 const savedRanks = JSON.parse(localStorage.getItem("fcTrackerRanks") || "{}");
 
-let goal = Number(localStorage.getItem("fcGoal") || 500000);
+let goal = Number(localStorage.getItem("fcGoal") || 100000);
 let players = PLAYERS.map(name => ({
     name,
     rank:"Betöltés...",
@@ -255,12 +256,8 @@ function updateSummary(){
     if(loaded){
         const raw = Math.min((total / goal) * 100, 100);
         document.getElementById("progress").style.width = Math.max(0,raw) + "%";
-        document.getElementById("percent").textContent = Math.floor(Math.max(0,raw));
-        document.getElementById("runsLeft").textContent = Math.max(0,Math.ceil((goal-total)/PER_RUN));
     }else{
         document.getElementById("progress").style.width = "0%";
-        document.getElementById("percent").textContent = "0";
-        document.getElementById("runsLeft").textContent = "—";
     }
 }
 function render(){
@@ -328,7 +325,6 @@ function openFcModal(mode){
     btn.textContent=mode==="add"?"FC Hozzáadása":"FC Elvétele";
     btn.className=mode==="add"?"green":"red";
     document.getElementById("fcAmount").value="";
-    document.getElementById("fcNote").value="";
     document.getElementById("fcModal").classList.add("open");
 }
 
@@ -452,10 +448,18 @@ document.querySelectorAll(".modal-bg").forEach(bg=>{
 async function fetchPlayer(name){
     // Ez csak akkor működik automatikusan, ha a megadott végpont valóban
     // nyilvános JSON API és engedélyezi a böngészőből érkező CORS kéréseket.
-    const response = await fetch(API_BASE + encodeURIComponent(name), {
-        headers:{Accept:"application/json"},
-        cache:"no-store"
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    let response;
+    try {
+        response = await fetch(API_BASE + encodeURIComponent(name), {
+            headers:{Accept:"application/json"},
+            cache:"no-store",
+            signal: controller.signal
+        });
+    } finally {
+        clearTimeout(timeout);
+    }
     if(!response.ok) throw new Error("HTTP " + response.status);
     const data = await response.json();
 
@@ -469,7 +473,7 @@ async function fetchPlayer(name){
 
 function showApiProblem(){
     document.getElementById("status").innerHTML =
-        '<span class="error">;
+        '<span class="error">A FyreMC adatok jelenleg nem érhetők el az API-n keresztül.</span>';
     document.getElementById("players").innerHTML = players.map((p,i)=>`
         <tr class="${i===selectedIndex?'selected':''}" onclick="selectPlayer(${i})">
             <td>${escapeHtml(p.name)}</td>
