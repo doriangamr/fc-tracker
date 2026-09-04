@@ -165,7 +165,7 @@ input:focus,select:focus{border-color:#4c8cc8}
     </div>
 
     <div class="notice">
-        Az FC a FyreMC adatforrásból próbál betöltődni. A rangokat a Rangok kezelése menüben kézzel tudod vezetni, mert a FyreMC nem engedi a rang közvetlen lekérését. A módosítások csak ebben a saját trackerben mentődnek.
+        Az FC automatikus betöltéséhez a FyreMC-nek nyilvános, böngészőből elérhető API-t kell biztosítania. Ha ez nincs engedélyezve, az oldal nem tudja közvetlenül kiolvasni az adatot. A rangokat a Rangok kezelése menüben kézzel tudod vezetni, és ezek alapján működik a Napi FC.
     </div>
 </section>
 
@@ -223,6 +223,10 @@ const RANK_OPTIONS = [
 ];
 const API_BASE = "https://account.fyremc.hu/api/player/";
 const PER_RUN = 3600;
+
+const overrides = JSON.parse(localStorage.getItem("fcAdjustments") || "{}");
+const savedRanks = JSON.parse(localStorage.getItem("fcTrackerRanks") || "{}");
+
 let goal = Number(localStorage.getItem("fcGoal") || 500000);
 let players = PLAYERS.map(name => ({
     name,
@@ -234,9 +238,6 @@ let players = PLAYERS.map(name => ({
 let selectedIndex = -1;
 let sortKey = null;
 let sortDirection = 1;
-
-const overrides = JSON.parse(localStorage.getItem("fcAdjustments") || "{}");
-const savedRanks = JSON.parse(localStorage.getItem("fcTrackerRanks") || "{}");
 
 function fmt(n){
     return Math.round(Number(n)).toLocaleString("hu-HU");
@@ -454,18 +455,38 @@ document.querySelectorAll(".modal-bg").forEach(bg=>{
 });
 
 async function fetchPlayer(name){
-    const response=await fetch(API_BASE + encodeURIComponent(name),{
-        headers:{Accept:"application/json"}
+    // Ez csak akkor működik automatikusan, ha a megadott végpont valóban
+    // nyilvános JSON API és engedélyezi a böngészőből érkező CORS kéréseket.
+    const response = await fetch(API_BASE + encodeURIComponent(name), {
+        headers:{Accept:"application/json"},
+        cache:"no-store"
     });
-    if(!response.ok) throw new Error("HTTP "+response.status);
-    const data=await response.json();
+    if(!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
 
-    const fc=findNumber(data,[
-        "fyrecoin","fyrecoins","fc","coins","balance","currency"
+    const fc = findNumber(data,[
+        "fyrecoin","fyrecoins","fyreCoin","fyreCoins","fc","coins","balance","currency"
     ]);
-    const rank=findRank(data);
+    const rank = findRank(data);
 
     return {fc,rank};
+}
+
+function showApiProblem(){
+    document.getElementById("status").innerHTML =
+        '<span class="error">A FyreMC adatok automatikus lekérése nem érhető el ebből a HTML-ből.</span>';
+    document.getElementById("players").innerHTML = players.map((p,i)=>`
+        <tr class="${i===selectedIndex?'selected':''}" onclick="selectPlayer(${i})">
+            <td>${escapeHtml(p.name)}</td>
+            <td><span class="badge rank">${escapeHtml(
+                p.ranks && p.ranks.length ? p.ranks.join(", ") : "Rang megadása szükséges"
+            )}</span></td>
+            <td><span class="badge fc">${
+                Number.isFinite(p.fc) ? escapeHtml(fmt(p.fc)+" FC") : "FC megadása szükséges"
+            }</span></td>
+        </tr>
+    `).join("");
+    updateSummary();
 }
 
 async function loadPlayers(){
@@ -485,21 +506,31 @@ async function loadPlayers(){
     render();
 
     let success=0;
+    let firstError="";
+
     for(const p of players){
         try{
             const result=await fetchPlayer(p.name);
+
             p.rank=result.rank || "Ismeretlen";
             p.fc=Number.isFinite(result.fc) ? result.fc : null;
 
-            // A kézi FC-korrekció hozzáadódik a FyreMC-ről kapott alapértékhez.
+            // A kézi FC-korrekció hozzáadódik az API-ból kapott alapértékhez.
             if(Number.isFinite(p.fc) && p.adjustment) p.fc += p.adjustment;
 
             if(Number.isFinite(p.fc)) success++;
         }catch(e){
+            if(!firstError) firstError=String(e && e.message ? e.message : e);
             p.rank="Nem elérhető";
             p.fc=null;
         }
         render();
+    }
+
+    if(success===0){
+        showApiProblem();
+        console.warn("FyreMC API lekérés sikertelen:", firstError);
+        return;
     }
 
     document.getElementById("status").textContent =
