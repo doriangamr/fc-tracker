@@ -122,18 +122,15 @@ input:focus,select:focus{border-color:#4c8cc8}
     <div class="total">
         Összesített FC:
         <span class="current" id="currentFc">Betöltés...</span>
-        / <span class="editable" id="goal" title="Kattints a cél szerkesztéséhez">500.000</span> FC
+        / <span class="editable" id="goal" title="Kattints a cél szerkesztéséhez">100.000</span> FC
     </div>
 
     <div class="progress-track">
         <div class="progress-fill" id="progress"></div>
     </div>
 
-    <div class="percentage">Teljes cél <span id="percent">0%</span>-a teljesítve</div>
-
     <div class="remaining">
-        <div class="remaining-main">Még <span id="runsLeft">—</span> teljes lefutás szükséges a célig</div>
-        <div class="remaining-small">(körönként 3.600 FC-vel számolva)</div>
+        <div class="remaining-main">Körönként 3.600 FC-vel számolva</div>
     </div>
 </section>
 
@@ -165,7 +162,7 @@ input:focus,select:focus{border-color:#4c8cc8}
     </div>
 
     <div class="notice">
-        Az FC automatikus betöltéséhez a FyreMC-nek nyilvános, böngészőből elérhető API-t kell biztosítania. Ha ez nincs engedélyezve, az oldal nem tudja közvetlenül kiolvasni az adatot. A rangokat a Rangok kezelése menüben kézzel tudod vezetni, és ezek alapján működik a Napi FC.
+        
     </div>
 </section>
 
@@ -175,8 +172,7 @@ input:focus,select:focus{border-color:#4c8cc8}
   <div class="modal-head"><div class="modal-title" id="fcModalTitle">FC Hozzáadása</div><button class="close" onclick="closeModals()">×</button></div>
   <div class="modal-body">
    <div class="field"><label>Felhasználónév</label><select id="fcUser"></select></div>
-   <div class="field"><label>Mennyiség (FC)</label><input id="fcAmount" type="number" min="1" step="1" placeholder="Pl. 5000"></div>
-   <div class="field"><label>Megjegyzés</label><input id="fcNote" type="text" placeholder="Pl. Elszámolás"></div>
+   <div class="field"><label>Mennyiség (FC)</label><input id="fcAmount" type="number" min="1" step="1" placeholder="40"></div>
    <div class="modal-actions"><button class="green" id="fcConfirm" onclick="confirmFc()">FC Hozzáadása</button><button onclick="closeModals()">Mégse</button></div>
   </div>
  </div>
@@ -203,7 +199,7 @@ input:focus,select:focus{border-color:#4c8cc8}
    <div class="field"><label>Rang</label><select id="rankChoice"></select></div>
    <div class="field" id="customRankField" style="display:none">
      <label>Egyedi rang neve</label>
-     <input id="customRank" type="text" placeholder="Pl. Manager">
+     <input id="customRank" type="text" placeholder="Bunny">
    </div>
    <div class="help">Mivel a FyreMC nem engedi a rang közvetlen lekérését, itt kézzel tudod felvenni az accounton lévő rangokat. Minden felvett rang 1 rangnak számít a Napi FC-nél.</div>
    <div class="modal-actions"><button id="rankConfirm" class="green" onclick="confirmRank()">Rang hozzáadása</button><button onclick="closeModals()">Mégse</button></div>
@@ -218,8 +214,7 @@ const PLAYERS = [
 ];
 
 const RANK_OPTIONS = [
-    "Glacier","Bunny","Abyss","Titan","Legend","Hero","King","Duke",
-    "Prince","Lord","Knight","VIP","VIP+","MVP","MVP+","Egyedi rang"
+    "Bunny","Glacier","Abyss","Egyedi rang"
 ];
 const API_BASE = "https://account.fyremc.hu/api/player/";
 const PER_RUN = 3600;
@@ -474,7 +469,7 @@ async function fetchPlayer(name){
 
 function showApiProblem(){
     document.getElementById("status").innerHTML =
-        '<span class="error">A FyreMC adatok automatikus lekérése nem érhető el ebből a HTML-ből.</span>';
+        '<span class="error">;
     document.getElementById("players").innerHTML = players.map((p,i)=>`
         <tr class="${i===selectedIndex?'selected':''}" onclick="selectPlayer(${i})">
             <td>${escapeHtml(p.name)}</td>
