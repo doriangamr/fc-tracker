@@ -128,6 +128,7 @@ input:focus,select:focus{border-color:#4c8cc8}
     <div class="progress-track">
         <div class="progress-fill" id="progress"></div>
     </div>
+    <div class="percentage" id="percent">0% teljesítve</div>
 
     <div class="remaining">
         <div class="remaining-main">Körönként 450 FC-vel számolva</div>
@@ -167,6 +168,26 @@ input:focus,select:focus{border-color:#4c8cc8}
     </div>
 </section>
 
+<!-- Napi FC megerősítés -->
+<div class="modal-bg" id="dailyConfirmModal">
+ <div class="modal">
+  <div class="modal-head">
+   <div class="modal-title">Napi FC</div>
+   <button class="close" onclick="closeModals()">×</button>
+  </div>
+  <div class="modal-body">
+   <div class="current-box" style="margin-bottom:0">
+    A Napi FC hozzáadása minden accountnak automatikusan jóváírja a rangjai alapján járó FC.<br><br>
+    <strong>1 rang = +40 FC</strong>
+   </div>
+   <div class="modal-actions">
+    <button class="green" onclick="confirmDailyFc()">Elfogadom</button>
+    <button class="red" onclick="closeModals()">Elutasítom</button>
+   </div>
+  </div>
+ </div>
+</div>
+
 <!-- FC módosító menü -->
 <div class="modal-bg" id="fcModal">
  <div class="modal">
@@ -202,6 +223,7 @@ input:focus,select:focus{border-color:#4c8cc8}
      <label>Egyedi rang neve</label>
      <input id="customRank" type="text" placeholder="Bunny">
    </div>
+   <div class="help"></div>
    <div class="modal-actions"><button id="rankConfirm" class="green" onclick="confirmRank()">Rang hozzáadása</button><button onclick="closeModals()">Mégse</button></div>
   </div>
  </div>
@@ -253,9 +275,12 @@ function updateSummary(){
 
     if(loaded){
         const raw = Math.min((total / goal) * 100, 100);
-        document.getElementById("progress").style.width = Math.max(0,raw) + "%";
+        const percent = Math.max(0, raw);
+        document.getElementById("progress").style.width = percent + "%";
+        document.getElementById("percent").textContent = Math.floor(percent) + "% teljesítve";
     }else{
         document.getElementById("progress").style.width = "0%";
+        document.getElementById("percent").textContent = "0% teljesítve";
     }
 }
 function render(){
@@ -404,31 +429,34 @@ function confirmRank(){
 }
 
 function dailyFc(){
-    if(selectedIndex<0){
-        alert("Előbb kattints arra a játékosra, akinek a napi FC-jét hozzáadod.");
-        return;
-    }
+    document.getElementById("dailyConfirmModal").classList.add("open");
+}
 
-    const p=players[selectedIndex];
-    if(!Number.isFinite(p.fc)) p.fc=0;
+function confirmDailyFc(){
+    let totalAdded = 0;
+    let accountsUpdated = 0;
 
-    const rankCount=(p.ranks || []).length;
-    const amount=rankCount*40;
+    players.forEach(p=>{
+        if(!Number.isFinite(p.fc)) p.fc=0;
 
-    if(rankCount===0){
-        alert("Ennek az accountnak nincs hozzáadott rangja. Előbb a Rangok kezelése menüben add hozzá a rangjait.");
-        return;
-    }
+        const rankCount=(p.ranks || []).length;
+        const amount=rankCount*40;
 
-    p.fc+=amount;
-    p.adjustment=(p.adjustment||0)+amount;
+        if(amount>0){
+            p.fc+=amount;
+            p.adjustment=(p.adjustment||0)+amount;
+            totalAdded+=amount;
+            accountsUpdated++;
+        }
+    });
 
     save();
     render();
+    closeModals();
 
     alert(
-        `${p.name} napi FC-je hozzáadva: +${fmt(amount)} FC\n` +
-        `${rankCount} rang × 40 FC = ${fmt(amount)} FC`
+        `Napi FC hozzáadva ${accountsUpdated} accountnak.\n` +
+        `Összesen: +${fmt(totalAdded)} FC`
     );
 }
 
